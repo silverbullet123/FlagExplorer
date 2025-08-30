@@ -1,0 +1,83 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  frontendPath: 'frontend'
+  backendPath: 'backend'
+
+stages:
+  - stage: BuildAndTest
+    displayName: 'Build and Test Stage'
+    jobs:
+      - job: BackendTests
+        displayName: 'Run Backend Tests'
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '7.x'   # adjust to your .NET version
+          - script: |
+              cd $(backendPath)
+              dotnet restore
+              dotnet build --configuration $(buildConfiguration)
+              dotnet test --configuration $(buildConfiguration)
+            displayName: 'Build and Test Backend'
+
+      - job: FrontendTests
+        displayName: 'Run Frontend Tests'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+          - script: |
+              cd $(frontendPath)
+              npm install
+              npm run test
+            displayName: 'Run Frontend Tests'
+
+  - stage: BuildAndPackage
+    displayName: 'Build and Package Stage'
+    dependsOn: BuildAndTest
+    jobs:
+      - job: BackendPackage
+        displayName: 'Build and Package Backend'
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '7.x'
+          - script: |
+              cd $(backendPath)
+              dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/backend
+            displayName: 'Publish Backend'
+
+      - job: FrontendPackage
+        displayName: 'Build and Package Frontend'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+          - script: |
+              cd $(frontendPath)
+              npm install
+              npm run build
+              mkdir -p $(Build.ArtifactStagingDirectory)/frontend
+              cp -r dist/* $(Build.ArtifactStagingDirectory)/frontend
+            displayName: 'Build Frontend'
+
+  - stage: PublishArtifacts
+    displayName: 'Publish Artifacts'
+    dependsOn: BuildAndPackage
+    jobs:
+      - job: Publish
+        steps:
+          - publish: $(Build.ArtifactStagingDirectory)/backend
+            artifact: backend
+          - publish: $(Build.ArtifactStagingDirectory)/frontend
+            artifact: frontend
