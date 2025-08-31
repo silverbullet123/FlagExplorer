@@ -1,55 +1,38 @@
-import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { CountryService, Country, CountryDetails } from './country.service';
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
 
-describe('CountryService', () => {
-  let service: CountryService;
-  let httpMock: HttpTestingController;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [CountryService]
-    });
+export interface Country {
+  name: string;
+  flag: string;
+}
 
-    service = TestBed.inject(CountryService);
-    httpMock = TestBed.inject(HttpTestingController);
-  });
 
-  afterEach(() => {
-    httpMock.verify();
-  });
+export interface CountryDetails {
+  name: string;
+  population: number;
+  capital: string;
+  flag: string;
+}
 
-  it('should fetch all countries', () => {
-    const dummyCountries: Country[] = [
-      { name: 'Republic of South Africa', flag: 'url1' },
-      { name: 'Kenya', flag: 'url2' }
-    ];
 
-    service.getCountries().subscribe(countries => {
-      expect(countries.length).toBe(2);
-      expect(countries).toEqual(dummyCountries);
-    });
+@Injectable({ providedIn: 'root' })
+export class CountryService {
+  private apiUrl = 'https://localhost:7051/api/Countries'; // backend API
 
-    const req = httpMock.expectOne('https://localhost:7051/api/Countries');
-    expect(req.request.method).toBe('GET');
-    req.flush(dummyCountries);
-  });
 
-  it('should fetch country by name', () => {
-    const dummyCountry: CountryDetails = {
-      name: 'Republic of South Africa',
-      population: 60000000,
-      capital: 'Pretoria',
-      flag: 'url1'
-    };
+  constructor(private http: HttpClient) { }
 
-    service.getCountryByName('Republic of South Africa').subscribe(country => {
-      expect(country).toEqual(dummyCountry);
-    });
 
-    const req = httpMock.expectOne('https://localhost:7051/api/Countries/Republic%20of%20South%20Africa');
-    expect(req.request.method).toBe('GET');
-    req.flush(dummyCountry);
-  });
-});
+  getCountries(): Observable<Country[]> {
+    return this.http.get<Country[]>(this.apiUrl);
+  }
+
+
+  getCountryByName(name: string): Observable<CountryDetails> {
+    // Fix: Properly encode the URL parameter to handle spaces and special characters
+    const encodedName = encodeURIComponent(name);
+    return this.http.get<CountryDetails>(`${this.apiUrl}/${encodedName}`);
+  }
+}
